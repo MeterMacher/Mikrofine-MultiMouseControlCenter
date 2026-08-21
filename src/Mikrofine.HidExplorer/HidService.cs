@@ -10,12 +10,13 @@ public sealed class HidService
     public ObservableCollection<HidDeviceInfo> Enumerate()
     {
         var result = new ObservableCollection<HidDeviceInfo>();
-
         foreach (var device in _loader.GetDevices())
         {
             try
             {
                 var descriptor = device.GetRawReportDescriptor() ?? [];
+                var model = HidReportDescriptorParser.Parse(descriptor);
+                var firstInput = model.InputFields.FirstOrDefault(f => !f.IsConstant);
                 result.Add(new HidDeviceInfo
                 {
                     DevicePath = device.DevicePath,
@@ -27,15 +28,17 @@ public sealed class HidService
                     InputReportLength = device.MaxInputReportLength,
                     OutputReportLength = device.MaxOutputReportLength,
                     FeatureReportLength = device.MaxFeatureReportLength,
-                    ReportDescriptor = descriptor
+                    UsagePage = firstInput is null ? "Unknown" : $"0x{firstInput.UsagePage:X2}",
+                    Usage = firstInput is null ? "Unknown" : firstInput.UsageSummary,
+                    ReportDescriptor = descriptor,
+                    DescriptorModel = model
                 });
             }
             catch
             {
-                // A device may disappear during enumeration. Ignore that entry.
+                // Devices can disappear during enumeration/hot unplug.
             }
         }
-
         return result;
     }
 
@@ -45,9 +48,7 @@ public sealed class HidService
     public async Task MonitorInputAsync(string devicePath, Action<byte[]> onReport, CancellationToken cancellationToken)
     {
         var device = Find(devicePath) ?? throw new InvalidOperationException("HID device is no longer available.");
-        if (!device.TryOpen(out var stream))
-            throw new IOException("The HID device could not be opened for input monitoring.");
-
+        if (!device.TryOpen(out var stream)) throw new IOException("The HID device could not be opened.");
         using (stream)
         {
             var buffer = new byte[Math.Max(1, device.MaxInputReportLength)];
