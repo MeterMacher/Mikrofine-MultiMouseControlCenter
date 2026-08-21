@@ -14,6 +14,7 @@ public sealed class HidDeviceInfo
     public string UsagePage { get; init; } = "Unknown";
     public string Usage { get; init; } = "Unknown";
     public byte[] ReportDescriptor { get; init; } = [];
+    public HidReportDescriptorModel DescriptorModel { get; init; } = new();
 
     public string DisplayName => string.IsNullOrWhiteSpace(Product)
         ? $"HID {VendorId:X4}:{ProductId:X4}"
