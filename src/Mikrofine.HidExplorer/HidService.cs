@@ -1,6 +1,5 @@
 using HidSharp;
 using System.Collections.ObjectModel;
-using System.Management;
 
 namespace Mikrofine.HidExplorer;
 
@@ -42,6 +41,24 @@ public sealed class HidService
 
     public HidDevice? Find(string devicePath) =>
         _loader.GetDevices().FirstOrDefault(d => string.Equals(d.DevicePath, devicePath, StringComparison.OrdinalIgnoreCase));
+
+    public async Task MonitorInputAsync(string devicePath, Action<byte[]> onReport, CancellationToken cancellationToken)
+    {
+        var device = Find(devicePath) ?? throw new InvalidOperationException("HID device is no longer available.");
+        if (!device.TryOpen(out var stream))
+            throw new IOException("The HID device could not be opened for input monitoring.");
+
+        using (stream)
+        {
+            var buffer = new byte[Math.Max(1, device.MaxInputReportLength)];
+            while (!cancellationToken.IsCancellationRequested)
+            {
+                var read = await stream.ReadAsync(buffer, 0, buffer.Length, cancellationToken);
+                if (read <= 0) break;
+                onReport(buffer[..read]);
+            }
+        }
+    }
 
     private static string Safe(Func<string?> getter)
     {
