@@ -1,0 +1,1 @@
+This file intentionally contains no implementation. HID Explorer source lives alongside it.
